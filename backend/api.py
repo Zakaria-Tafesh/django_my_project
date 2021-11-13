@@ -2,6 +2,7 @@ from rest_framework import viewsets, permissions, generics
 from rest_framework.response import Response
 from knox.models import AuthToken
 from .serializers import CreateUserSerializer, UserSerializer, LoginUserSerializer
+from django.http import JsonResponse
 
 
 class RegistrationAPI(generics.GenericAPIView):
@@ -44,12 +45,13 @@ class MyAuthTokenSerializer(serializers.Serializer):
         email = attrs.get('email')
         password = attrs.get('password')
         try:
-            username = User.objects.filter(email=email).username
-        except:
-            msg = _('Unable to log in with provided credentials.')
+            username = User.objects.get(email=email).username
+        except Exception as e:
+            print('#'*50, e)
+            msg = _('Error Username')
             raise serializers.ValidationError(msg, code='authorization')
-        if email and password:
 
+        if email and password:
             user = authenticate(request=self.context.get('request'),
                                 username=username, password=password)
 
@@ -57,12 +59,12 @@ class MyAuthTokenSerializer(serializers.Serializer):
             # users. (Assuming the default ModelBackend authentication
             # backend.)
             if not user:
-                msg = _('Unable to log in with provided credentials.')
+                msg = _('Error Password')
                 raise serializers.ValidationError(msg, code='authorization')
         else:
             msg = _('Must include "username" and "password".')
             raise serializers.ValidationError(msg, code='authorization')
-
+            # ][;
         attrs['user'] = user
         return attrs
 
@@ -95,3 +97,39 @@ class UserAPI(generics.RetrieveAPIView):
 
     def get_object(self):
         return self.request.user
+
+from rest_framework.decorators import api_view,permission_classes
+from rest_framework.permissions import IsAuthenticated
+
+@api_view(['POST'])
+@permission_classes((IsAuthenticated, ))
+def change_password(request):
+    try:
+        user = User.objects.get(pk=request.user.id)
+    except :
+        return JsonResponse({'status': "User Not Found 404"})
+    try:
+        old_password = request.POST['old_password']
+        new_password = request.POST['new_password']
+        confirm_new_password = request.POST['confirm_new_password']
+    except:
+        msg = _('يرجى التأكد من إدخال جميع الحقول.')
+        raise serializers.ValidationError(msg, code='authorization')
+
+    if not user.check_password(old_password):
+        msg = _('كلمة المرور القديمة المدخلة غير صحيحة')
+        raise serializers.ValidationError(msg, code='authorization')
+    elif new_password != confirm_new_password :
+        msg = _('كلمات المرور المدخلة غير متطابقة.')
+        raise serializers.ValidationError(msg, code='authorization')
+    if len(new_password) < 8 :
+        msg = _('كلمة المرور قصيرة جدا ، يجب أن لا تقل كلمة المرور عن 8 حروف أو أرقام.')
+        raise serializers.ValidationError(msg, code='authorization')
+    elif old_password == new_password :
+        msg = _('كلمة المرور القديمة لا يمكن أن تكون هي كلمة المرور الجديدة، يرجى إختيار كلمة أخرى.')
+        raise serializers.ValidationError(msg, code='authorization')
+    else :
+        user.set_password(new_password)
+        user.save()
+        # update_session_auth_hash(request, user)
+        return JsonResponse({'status': "تم تغيير كلمة المرور بنجاح"})
