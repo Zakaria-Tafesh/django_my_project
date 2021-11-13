@@ -48,7 +48,7 @@ class MyAuthTokenSerializer(serializers.Serializer):
             username = User.objects.get(email=email).username
         except Exception as e:
             print('#'*50, e)
-            msg = _('Error Username')
+            msg = _('No Username Found, Please check Username again!')
             raise serializers.ValidationError(msg, code='authorization')
 
         if email and password:
@@ -59,7 +59,7 @@ class MyAuthTokenSerializer(serializers.Serializer):
             # users. (Assuming the default ModelBackend authentication
             # backend.)
             if not user:
-                msg = _('Error Password')
+                msg = _('Password is incorrect')
                 raise serializers.ValidationError(msg, code='authorization')
         else:
             msg = _('Must include "username" and "password".')
